@@ -21,6 +21,9 @@
       --text: #f7f2ff;
       --muted: #aaa1b8;
       --muted-2: #756d82;
+      --locked-bg: #141217;
+      --locked-border: #2d2931;
+      --locked-text: #67616d;
       --purple: #8b5cf6;
       --purple-2: #a78bfa;
       --purple-dark: #6d28d9;
@@ -149,6 +152,66 @@
     }
 
     .reset:active { transform: scale(.98); }
+
+    .status-wrap {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      flex: 0 0 auto;
+    }
+
+    .lock-status {
+      min-width: 98px;
+      min-height: 36px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      padding: 0 11px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: #15121b;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 850;
+      letter-spacing: .04em;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
+    .lock-status::before {
+      content: '';
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #5c5563;
+      box-shadow: 0 0 0 4px rgba(255,255,255,.025);
+    }
+
+    .lock-status.ready {
+      color: #bcaef3;
+      border-color: rgba(139,92,246,.25);
+      background: rgba(139,92,246,.08);
+    }
+
+    .lock-status.ready::before {
+      background: var(--purple);
+      box-shadow: 0 0 0 4px var(--purple-soft), 0 0 12px rgba(139,92,246,.35);
+    }
+
+    .lock-status.locked {
+      color: #8e8794;
+      background: #111015;
+      border-color: #28242d;
+    }
+
+    .reset:disabled {
+      cursor: not-allowed;
+      color: #5f5965;
+      background: #111015;
+      border-color: #28242d;
+      transform: none;
+    }
 
     .state-line {
       margin: 22px 0 0;
@@ -292,6 +355,30 @@
       box-shadow: 0 12px 30px rgba(109,40,217,.36), 0 0 24px rgba(139,92,246,.15), inset 0 1px 0 rgba(255,255,255,.14);
     }
 
+    .segment:disabled {
+      cursor: not-allowed;
+      color: var(--locked-text);
+      background: var(--locked-bg);
+      border-color: var(--locked-border);
+      box-shadow: none;
+      transform: none;
+    }
+
+    .segment.selected:disabled {
+      color: #c3bdc8;
+      background: #38333c;
+      border-color: #4b4550;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.035);
+    }
+
+    .state-card.locked {
+      border-color: #242129;
+    }
+
+    .state-card.locked .card-value {
+      color: #8a8390;
+    }
+
     .hint {
       margin: 0;
       padding: 2px 5px;
@@ -341,7 +428,10 @@
               <h1>Market State</h1>
             </div>
           </div>
-          <button class="reset" id="resetBtn" type="button">Reset</button>
+          <div class="status-wrap">
+            <div class="lock-status ready" id="lockStatus" role="status" aria-live="polite">READY</div>
+            <button class="reset" id="resetBtn" type="button">Reset</button>
+          </div>
         </div>
 
         <div class="state-line" id="stateLine"></div>
@@ -352,11 +442,13 @@
 
     <section class="grid" id="stateGrid" aria-label="Market state controls"></section>
 
-    <p class="hint">Tap a choice to select it. Tap the selected choice again to return that row to neutral. Your state is saved automatically on this device.</p>
+    <p class="hint">Each successful change is a commitment: the full control panel locks for 5 minutes. The countdown persists through refreshes and reopening the app.</p>
   </main>
 
   <script>
     const STORAGE_KEY = 'dk-market-state-v1';
+    const LOCK_UNTIL_KEY = 'dk-market-state-lock-until-v1';
+    const LOCK_DURATION_MS = 5 * 60 * 1000;
 
     const groups = [
       {
@@ -388,6 +480,8 @@
     const defaultState = Object.fromEntries(groups.map(g => [g.id, null]));
     let state = loadState();
     let lastUpdated = null;
+    let lockUntil = loadLockUntil();
+    let lockTimer = null;
 
     function loadState() {
       try {
@@ -408,6 +502,72 @@
       lastUpdated = new Date();
     }
 
+    function loadLockUntil() {
+      const stored = Number(localStorage.getItem(LOCK_UNTIL_KEY));
+      return Number.isFinite(stored) && stored > Date.now() ? stored : 0;
+    }
+
+    function isLocked() {
+      return lockUntil > Date.now();
+    }
+
+    function beginLock() {
+      lockUntil = Date.now() + LOCK_DURATION_MS;
+      localStorage.setItem(LOCK_UNTIL_KEY, String(lockUntil));
+      startLockTimer();
+    }
+
+    function clearExpiredLock() {
+      if (lockUntil && lockUntil <= Date.now()) {
+        lockUntil = 0;
+        localStorage.removeItem(LOCK_UNTIL_KEY);
+        return true;
+      }
+      return false;
+    }
+
+    function formatRemaining(ms) {
+      const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;
+      return `${minutes}:${String(seconds).padStart(2, '0')}`;
+    }
+
+    function updateLockUI() {
+      const status = document.getElementById('lockStatus');
+      const reset = document.getElementById('resetBtn');
+      const locked = isLocked();
+
+      status.className = `lock-status ${locked ? 'locked' : 'ready'}`;
+      status.textContent = locked ? `LOCKED ${formatRemaining(lockUntil - Date.now())}` : 'READY';
+      reset.disabled = locked;
+
+      document.querySelectorAll('.segment').forEach(button => {
+        button.disabled = locked;
+      });
+
+      document.querySelectorAll('.state-card').forEach(card => {
+        card.classList.toggle('locked', locked);
+      });
+    }
+
+    function startLockTimer() {
+      if (lockTimer) clearInterval(lockTimer);
+      updateLockUI();
+
+      if (!isLocked()) return;
+
+      lockTimer = setInterval(() => {
+        if (clearExpiredLock()) {
+          clearInterval(lockTimer);
+          lockTimer = null;
+          render();
+          return;
+        }
+        updateLockUI();
+      }, 1000);
+    }
+
     function displayValue(group) {
       return state[group.id] || 'Neutral';
     }
@@ -418,7 +578,7 @@
 
       groups.forEach(group => {
         const card = document.createElement('article');
-        card.className = 'state-card';
+        card.className = 'state-card' + (isLocked() ? ' locked' : '');
 
         const head = document.createElement('div');
         head.className = 'card-head';
@@ -444,9 +604,12 @@
           button.type = 'button';
           button.textContent = option;
           button.setAttribute('aria-pressed', state[group.id] === option ? 'true' : 'false');
+          button.disabled = isLocked();
           button.addEventListener('click', () => {
+            if (isLocked()) return;
             state[group.id] = state[group.id] === option ? null : option;
             saveState();
+            beginLock();
             render();
           });
           segments.appendChild(button);
@@ -457,6 +620,7 @@
       });
 
       renderSummary();
+      updateLockUI();
     }
 
     function renderSummary() {
@@ -486,12 +650,16 @@
     }
 
     document.getElementById('resetBtn').addEventListener('click', () => {
+      if (isLocked()) return;
       state = { ...defaultState };
       saveState();
+      beginLock();
       render();
     });
 
+    clearExpiredLock();
     render();
+    startLockTimer();
 
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
