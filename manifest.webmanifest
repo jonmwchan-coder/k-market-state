@@ -4,8 +4,8 @@
   "description": "Touch-first live market state dashboard for HTF trend, regime, leg, and lean.",
   "start_url": "./",
   "display": "standalone",
-  "background_color": "#f7f5fc",
-  "theme_color": "#6f43f5",
+  "background_color": "#09070d",
+  "theme_color": "#0b0910",
   "orientation": "any",
   "icons": [
     {
