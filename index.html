@@ -199,6 +199,17 @@
       box-shadow: 0 0 0 4px var(--purple-soft), 0 0 12px rgba(139,92,246,.35);
     }
 
+    .lock-status.editing {
+      color: #d9ceff;
+      border-color: rgba(167,139,250,.35);
+      background: rgba(139,92,246,.13);
+    }
+
+    .lock-status.editing::before {
+      background: var(--purple-2);
+      box-shadow: 0 0 0 4px var(--purple-soft), 0 0 12px rgba(167,139,250,.38);
+    }
+
     .lock-status.locked {
       color: #8e8794;
       background: #111015;
@@ -442,12 +453,14 @@
 
     <section class="grid" id="stateGrid" aria-label="Market state controls"></section>
 
-    <p class="hint">Each successful change is a commitment: the full control panel locks for 5 minutes. The countdown persists through refreshes and reopening the app.</p>
+    <p class="hint">Your first change opens a 10-second edit window for any other updates. When that window ends, the full control panel locks for 5 minutes. Both timers persist through refreshes and reopening the app.</p>
   </main>
 
   <script>
     const STORAGE_KEY = 'dk-market-state-v1';
+    const EDIT_UNTIL_KEY = 'dk-market-state-edit-until-v1';
     const LOCK_UNTIL_KEY = 'dk-market-state-lock-until-v1';
+    const EDIT_WINDOW_MS = 10 * 1000;
     const LOCK_DURATION_MS = 5 * 60 * 1000;
 
     const groups = [
@@ -480,8 +493,9 @@
     const defaultState = Object.fromEntries(groups.map(g => [g.id, null]));
     let state = loadState();
     let lastUpdated = null;
-    let lockUntil = loadLockUntil();
-    let lockTimer = null;
+    let editUntil = loadTimestamp(EDIT_UNTIL_KEY);
+    let lockUntil = loadTimestamp(LOCK_UNTIL_KEY);
+    let cycleTimer = null;
 
     function loadState() {
       try {
@@ -502,28 +516,57 @@
       lastUpdated = new Date();
     }
 
-    function loadLockUntil() {
-      const stored = Number(localStorage.getItem(LOCK_UNTIL_KEY));
-      return Number.isFinite(stored) && stored > Date.now() ? stored : 0;
+    function loadTimestamp(key) {
+      const stored = Number(localStorage.getItem(key));
+      return Number.isFinite(stored) && stored > 0 ? stored : 0;
+    }
+
+    function isEditing() {
+      return editUntil > Date.now();
     }
 
     function isLocked() {
-      return lockUntil > Date.now();
+      const now = Date.now();
+      // Old versions may have a future lockUntil but no editUntil; keep that lock valid.
+      if (!editUntil && lockUntil > now) return true;
+      return editUntil > 0 && now >= editUntil && lockUntil > now;
     }
 
-    function beginLock() {
-      lockUntil = Date.now() + LOCK_DURATION_MS;
+    function beginCommitCycle() {
+      // The first change starts one fixed 10-second edit window. Additional
+      // changes inside it do not extend the window.
+      if (isEditing() || isLocked()) return;
+      const now = Date.now();
+      editUntil = now + EDIT_WINDOW_MS;
+      lockUntil = editUntil + LOCK_DURATION_MS;
+      localStorage.setItem(EDIT_UNTIL_KEY, String(editUntil));
       localStorage.setItem(LOCK_UNTIL_KEY, String(lockUntil));
-      startLockTimer();
+      startCycleTimer();
     }
 
-    function clearExpiredLock() {
-      if (lockUntil && lockUntil <= Date.now()) {
+    function clearExpiredCycle() {
+      const now = Date.now();
+      if (lockUntil && lockUntil <= now) {
+        editUntil = 0;
         lockUntil = 0;
+        localStorage.removeItem(EDIT_UNTIL_KEY);
         localStorage.removeItem(LOCK_UNTIL_KEY);
         return true;
       }
       return false;
+    }
+
+    function normalizeCycle() {
+      const now = Date.now();
+      if (editUntil && lockUntil && lockUntil <= editUntil) {
+        lockUntil = editUntil + LOCK_DURATION_MS;
+        localStorage.setItem(LOCK_UNTIL_KEY, String(lockUntil));
+      }
+      if (editUntil && editUntil <= now && !lockUntil) {
+        lockUntil = editUntil + LOCK_DURATION_MS;
+        localStorage.setItem(LOCK_UNTIL_KEY, String(lockUntil));
+      }
+      clearExpiredCycle();
     }
 
     function formatRemaining(ms) {
@@ -536,10 +579,20 @@
     function updateLockUI() {
       const status = document.getElementById('lockStatus');
       const reset = document.getElementById('resetBtn');
+      const editing = isEditing();
       const locked = isLocked();
 
-      status.className = `lock-status ${locked ? 'locked' : 'ready'}`;
-      status.textContent = locked ? `LOCKED ${formatRemaining(lockUntil - Date.now())}` : 'READY';
+      if (editing) {
+        status.className = 'lock-status editing';
+        status.textContent = `LOCKS IN ${formatRemaining(editUntil - Date.now())}`;
+      } else if (locked) {
+        status.className = 'lock-status locked';
+        status.textContent = `LOCKED ${formatRemaining(lockUntil - Date.now())}`;
+      } else {
+        status.className = 'lock-status ready';
+        status.textContent = 'READY';
+      }
+
       reset.disabled = locked;
 
       document.querySelectorAll('.segment').forEach(button => {
@@ -551,25 +604,39 @@
       });
     }
 
-    function startLockTimer() {
-      if (lockTimer) clearInterval(lockTimer);
+    function startCycleTimer() {
+      if (cycleTimer) clearInterval(cycleTimer);
       updateLockUI();
 
-      if (!isLocked()) return;
+      if (!isEditing() && !isLocked()) return;
 
-      lockTimer = setInterval(() => {
-        if (clearExpiredLock()) {
-          clearInterval(lockTimer);
-          lockTimer = null;
+      cycleTimer = setInterval(() => {
+        const wasEditing = isEditing();
+        if (clearExpiredCycle()) {
+          clearInterval(cycleTimer);
+          cycleTimer = null;
           render();
           return;
         }
+
         updateLockUI();
-      }, 1000);
+
+        // When the 10-second edit window expires, redraw once so every control
+        // becomes disabled immediately for the 5-minute lock.
+        if (wasEditing && !isEditing()) {
+          render();
+        }
+      }, 250);
     }
 
     function displayValue(group) {
       return state[group.id] || 'Neutral';
+    }
+
+    function registerChange() {
+      saveState();
+      beginCommitCycle();
+      render();
     }
 
     function render() {
@@ -608,9 +675,7 @@
           button.addEventListener('click', () => {
             if (isLocked()) return;
             state[group.id] = state[group.id] === option ? null : option;
-            saveState();
-            beginLock();
-            render();
+            registerChange();
           });
           segments.appendChild(button);
         });
@@ -652,14 +717,12 @@
     document.getElementById('resetBtn').addEventListener('click', () => {
       if (isLocked()) return;
       state = { ...defaultState };
-      saveState();
-      beginLock();
-      render();
+      registerChange();
     });
 
-    clearExpiredLock();
+    normalizeCycle();
     render();
-    startLockTimer();
+    startCycleTimer();
 
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
@@ -667,5 +730,6 @@
       });
     }
   </script>
+
 </body>
 </html>
