@@ -29,6 +29,12 @@
       --purple-dark: #6d28d9;
       --purple-soft: rgba(139, 92, 246, .16);
       --purple-softer: rgba(139, 92, 246, .08);
+      --trend-green: #22c55e;
+      --trend-green-dark: #15803d;
+      --trend-green-soft: rgba(34, 197, 94, .16);
+      --trend-red: #ef4444;
+      --trend-red-dark: #b91c1c;
+      --trend-red-soft: rgba(239, 68, 68, .16);
       --border: #2b2435;
       --border-strong: #3a2e49;
       --shadow: 0 22px 60px rgba(0, 0, 0, .42);
@@ -254,6 +260,19 @@
       border-color: var(--border);
     }
 
+
+    .summary-chip.trend-bull {
+      background: var(--trend-green-soft);
+      color: #bbf7d0;
+      border-color: rgba(34,197,94,.22);
+    }
+
+    .summary-chip.trend-bear {
+      background: var(--trend-red-soft);
+      color: #fecaca;
+      border-color: rgba(239,68,68,.22);
+    }
+
     .arrow {
       color: #655b73;
       font-size: .9em;
@@ -324,6 +343,8 @@
     }
 
     .card-value.neutral { color: var(--muted-2); }
+    .card-value.trend-bull { color: #86efac; }
+    .card-value.trend-bear { color: #fca5a5; }
 
     .segments {
       display: grid;
@@ -366,6 +387,20 @@
       box-shadow: 0 12px 30px rgba(109,40,217,.36), 0 0 24px rgba(139,92,246,.15), inset 0 1px 0 rgba(255,255,255,.14);
     }
 
+    .segment.trend-bull {
+      color: #fff;
+      border-color: rgba(134,239,172,.22);
+      background: linear-gradient(145deg, var(--trend-green-dark), var(--trend-green));
+      box-shadow: 0 12px 30px rgba(21,128,61,.30), 0 0 24px rgba(34,197,94,.13), inset 0 1px 0 rgba(255,255,255,.13);
+    }
+
+    .segment.trend-bear {
+      color: #fff;
+      border-color: rgba(252,165,165,.20);
+      background: linear-gradient(145deg, var(--trend-red-dark), var(--trend-red));
+      box-shadow: 0 12px 30px rgba(185,28,28,.30), 0 0 24px rgba(239,68,68,.13), inset 0 1px 0 rgba(255,255,255,.13);
+    }
+
     .segment:disabled {
       cursor: not-allowed;
       color: var(--locked-text);
@@ -376,6 +411,14 @@
     }
 
     .segment.selected:disabled {
+      color: #c3bdc8;
+      background: #38333c;
+      border-color: #4b4550;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.035);
+    }
+
+    .segment.trend-bull:disabled,
+    .segment.trend-bear:disabled {
       color: #c3bdc8;
       background: #38333c;
       border-color: #4b4550;
@@ -453,7 +496,7 @@
 
     <section class="grid" id="stateGrid" aria-label="Market state controls"></section>
 
-    <p class="hint">Your first change opens a 10-second edit window for any other updates. When that window ends, the full control panel locks for 5 minutes. Both timers persist through refreshes and reopening the app.</p>
+    <p class="hint">Regime Trend cycles: green (bull trend) → red (bear trend) → clear. Your first change opens a 10-second edit window for any other updates; then the full panel locks for 5 minutes. Both timers persist through refreshes and reopening the app.</p>
   </main>
 
   <script>
@@ -503,7 +546,15 @@
         if (!parsed || typeof parsed !== 'object') return { ...defaultState };
         const clean = { ...defaultState };
         groups.forEach(group => {
-          if (group.options.includes(parsed[group.id])) clean[group.id] = parsed[group.id];
+          const value = parsed[group.id];
+          if (group.id === 'regime') {
+            // Migrate the old directionless Trend selection to the first new
+            // cycle state (green / bullish trend).
+            if (value === 'Trend') clean.regime = 'TrendBull';
+            else if (['TrendBull', 'TrendBear', 'Transition', 'Range'].includes(value)) clean.regime = value;
+          } else if (group.options.includes(value)) {
+            clean[group.id] = value;
+          }
         });
         return clean;
       } catch {
@@ -630,7 +681,34 @@
     }
 
     function displayValue(group) {
+      if (group.id === 'regime') {
+        if (state.regime === 'TrendBull') return 'Trend ↑';
+        if (state.regime === 'TrendBear') return 'Trend ↓';
+      }
       return state[group.id] || 'Neutral';
+    }
+
+    function regimeTone() {
+      if (state.regime === 'TrendBull') return 'trend-bull';
+      if (state.regime === 'TrendBear') return 'trend-bear';
+      return '';
+    }
+
+    function isOptionActive(group, option) {
+      if (group.id === 'regime' && option === 'Trend') {
+        return state.regime === 'TrendBull' || state.regime === 'TrendBear';
+      }
+      return state[group.id] === option;
+    }
+
+    function cycleOption(group, option) {
+      if (group.id === 'regime' && option === 'Trend') {
+        if (state.regime === 'TrendBull') state.regime = 'TrendBear';
+        else if (state.regime === 'TrendBear') state.regime = null;
+        else state.regime = 'TrendBull';
+        return;
+      }
+      state[group.id] = state[group.id] === option ? null : option;
     }
 
     function registerChange() {
@@ -655,7 +733,8 @@
         title.textContent = group.title;
 
         const value = document.createElement('div');
-        value.className = 'card-value' + (state[group.id] ? '' : ' neutral');
+        const tone = group.id === 'regime' ? regimeTone() : '';
+        value.className = 'card-value' + (state[group.id] ? '' : ' neutral') + (tone ? ` ${tone}` : '');
         value.textContent = displayValue(group);
 
         head.append(title, value);
@@ -667,14 +746,22 @@
 
         group.options.forEach(option => {
           const button = document.createElement('button');
-          button.className = 'segment' + (state[group.id] === option ? ' selected' : '');
+          const active = isOptionActive(group, option);
+          let buttonTone = '';
+          if (group.id === 'regime' && option === 'Trend') buttonTone = regimeTone();
+          button.className = 'segment' + (active && !buttonTone ? ' selected' : '') + (buttonTone ? ` ${buttonTone}` : '');
           button.type = 'button';
           button.textContent = option;
-          button.setAttribute('aria-pressed', state[group.id] === option ? 'true' : 'false');
+          button.setAttribute('aria-pressed', active ? 'true' : 'false');
+          if (group.id === 'regime' && option === 'Trend') {
+            if (state.regime === 'TrendBull') button.setAttribute('aria-label', 'Trend: bullish. Tap to switch to bearish trend.');
+            else if (state.regime === 'TrendBear') button.setAttribute('aria-label', 'Trend: bearish. Tap to clear trend.');
+            else button.setAttribute('aria-label', 'Trend. Tap for bullish trend.');
+          }
           button.disabled = isLocked();
           button.addEventListener('click', () => {
             if (isLocked()) return;
-            state[group.id] = state[group.id] === option ? null : option;
+            cycleOption(group, option);
             registerChange();
           });
           segments.appendChild(button);
@@ -694,7 +781,8 @@
 
       groups.forEach((group, index) => {
         const chip = document.createElement('span');
-        chip.className = 'summary-chip' + (state[group.id] ? '' : ' neutral');
+        const tone = group.id === 'regime' ? regimeTone() : '';
+        chip.className = 'summary-chip' + (state[group.id] ? '' : ' neutral') + (tone ? ` ${tone}` : '');
         chip.textContent = displayValue(group);
         stateLine.appendChild(chip);
 
