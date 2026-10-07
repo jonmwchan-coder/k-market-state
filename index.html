@@ -827,9 +827,26 @@
     }
 
     document.getElementById('resetBtn').addEventListener('click', () => {
+      // Reset is an abort/clear action, not a new commitment.
+      // It is allowed while READY or during the 10-second edit window,
+      // and it cancels any pending lock. Once the 5-minute lock has begun,
+      // updateLockUI() disables this button and this guard prevents bypassing it.
       if (isLocked()) return;
+
       state = { ...defaultState };
-      registerChange();
+      saveState();
+
+      editUntil = 0;
+      lockUntil = 0;
+      localStorage.removeItem(EDIT_UNTIL_KEY);
+      localStorage.removeItem(LOCK_UNTIL_KEY);
+
+      if (cycleTimer) {
+        clearInterval(cycleTimer);
+        cycleTimer = null;
+      }
+
+      render();
     });
 
     normalizeCycle();
