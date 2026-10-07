@@ -520,7 +520,7 @@
 
     <section class="grid" id="stateGrid" aria-label="Market state controls"></section>
 
-    <p class="hint">Regime Trend cycles: green (bull trend) → red (bear trend) → clear. Your first change opens a 10-second edit window for any other updates; then the full panel locks for 5 minutes. Both timers persist through refreshes and reopening the app.</p>
+    <p class="hint">Regime Trend cycles: green (bull trend) → red (bear trend) → clear. Your first change opens a 10-second edit window for any other updates; then the full panel locks for 5 minutes. Reset clears selections but never resets or cancels an active countdown. Both timers persist through refreshes and reopening the app.</p>
   </main>
 
   <script>
@@ -827,25 +827,13 @@
     }
 
     document.getElementById('resetBtn').addEventListener('click', () => {
-      // Reset is an abort/clear action, not a new commitment.
-      // It is allowed while READY or during the 10-second edit window,
-      // and it cancels any pending lock. Once the 5-minute lock has begun,
-      // updateLockUI() disables this button and this guard prevents bypassing it.
+      // Reset clears the current selections only. It NEVER changes, cancels,
+      // restarts, or extends an existing edit/lock timer. During the 5-minute
+      // locked period the button is disabled, and this guard prevents bypassing it.
       if (isLocked()) return;
 
       state = { ...defaultState };
       saveState();
-
-      editUntil = 0;
-      lockUntil = 0;
-      localStorage.removeItem(EDIT_UNTIL_KEY);
-      localStorage.removeItem(LOCK_UNTIL_KEY);
-
-      if (cycleTimer) {
-        clearInterval(cycleTimer);
-        cycleTimer = null;
-      }
-
       render();
     });
 
