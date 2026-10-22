@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#0b0910" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -94,9 +94,25 @@
 
     .topline {
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       justify-content: space-between;
       gap: 16px;
+    }
+
+    .header-controls {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 10px;
+      flex: 0 0 auto;
+    }
+
+    .status-row {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
     }
 
     .brand {
@@ -159,12 +175,6 @@
 
     .reset:active { transform: scale(.98); }
 
-    .status-wrap {
-      display: flex;
-      align-items: center;
-      gap: 9px;
-      flex: 0 0 auto;
-    }
 
     .lock-status {
       min-width: 98px;
@@ -228,6 +238,47 @@
       background: #111015;
       border-color: #28242d;
       transform: none;
+    }
+
+
+    /* Primary caution toggle: CHOP -> NO TRADE -> CHOP. */
+    .no-trade-btn {
+      width: 100%;
+      min-height: 46px;
+      border: 1px solid rgba(196,181,253,.36);
+      border-radius: 14px;
+      background: linear-gradient(140deg, #5422a7 0%, #8350e5 100%);
+      color: #fff;
+      padding: 0 16px;
+      font-weight: 900;
+      font-size: 13px;
+      letter-spacing: .10em;
+      cursor: pointer;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      box-shadow: 0 8px 22px rgba(109,40,217,.22), inset 0 1px 0 rgba(255,255,255,.12);
+      transition: background .17s ease, box-shadow .17s ease, filter .17s ease;
+    }
+
+    .no-trade-btn:hover:not(:disabled) { filter: brightness(1.07); }
+    .no-trade-btn:active:not(:disabled) { transform: scale(.985); }
+
+    .no-trade-btn.active {
+      border-color: rgba(252,165,165,.50);
+      background: linear-gradient(140deg, #991b1b 0%, #dc2626 100%);
+      box-shadow: 0 12px 28px rgba(185,28,28,.27), 0 0 18px rgba(239,68,68,.10), inset 0 1px 0 rgba(255,255,255,.12);
+    }
+
+    .no-trade-btn:disabled {
+      cursor: not-allowed;
+      transform: none;
+      opacity: .78;
+      filter: saturate(.56) brightness(.78);
+    }
+
+    .no-trade-btn:focus-visible {
+      outline: 2px solid #d3baff;
+      outline-offset: 3px;
     }
 
     .state-line {
@@ -304,10 +355,196 @@
       box-shadow: 0 0 0 4px var(--purple-soft), 0 0 14px rgba(139,92,246,.45);
     }
 
+    .grid-shell {
+      position: relative;
+    }
+
     .grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 16px;
+    }
+
+    .trade-block-overlay {
+      position: absolute;
+      inset: 0;
+      border-radius: 22px;
+      pointer-events: none;
+      opacity: 0;
+      visibility: hidden;
+      background: rgba(38,5,9,.065);
+      transition: opacity .2s ease, visibility .2s ease;
+    }
+
+    .trade-block-overlay.active {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .trade-block-overlay svg {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      inset: 0;
+      overflow: visible;
+      filter: drop-shadow(0 0 8px rgba(239,68,68,.18));
+    }
+
+    .trade-block-overlay .x-halo {
+      stroke: rgba(127,29,29,.24);
+      stroke-width: 12px;
+      vector-effect: non-scaling-stroke;
+      stroke-linecap: round;
+    }
+
+    .trade-block-overlay .x-line {
+      stroke: rgba(248,113,113,.86);
+      stroke-width: 3.5px;
+      vector-effect: non-scaling-stroke;
+      stroke-linecap: round;
+    }
+
+    .overlay-badge {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      min-height: 29px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 10px;
+      border-radius: 999px;
+      background: rgba(127,29,29,.88);
+      color: #fee2e2;
+      border: 1px solid rgba(252,165,165,.30);
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      box-shadow: 0 10px 24px rgba(127,29,29,.25);
+    }
+
+    .pressure-card {
+      background: linear-gradient(180deg, #14111b 0%, var(--surface-strong) 100%);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 18px;
+      box-shadow: 0 14px 34px rgba(0,0,0,.28);
+    }
+
+    .pressure-top {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .pressure-value {
+      font-size: 13px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      color: var(--muted-2);
+    }
+
+    .pressure-value.bearish { color: #fca5a5; }
+    .pressure-value.bullish { color: #86efac; }
+
+    .pressure-copy {
+      margin: 0 0 14px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .pressure-scale {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 12px;
+      margin-bottom: 12px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+    }
+
+    .pressure-scale span:nth-child(2) { text-align: center; }
+    .pressure-scale span:last-child { text-align: right; }
+
+    .pressure-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      display: block;
+      width: 100%;
+      height: 42px;
+      margin: 1px 0 0;
+      border: 0;
+      border-radius: 999px;
+      background: transparent;
+      outline: none;
+      touch-action: pan-y;
+      cursor: pointer;
+    }
+
+    .pressure-slider::-webkit-slider-runnable-track {
+      height: 9px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #c2414f 0%, #655e71 50%, #259b57 100%);
+      border: 1px solid rgba(255,255,255,.07);
+      box-shadow: inset 0 2px 3px rgba(0,0,0,.25);
+    }
+
+    .pressure-slider::-moz-range-track {
+      height: 9px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #c2414f 0%, #655e71 50%, #259b57 100%);
+      border: 1px solid rgba(255,255,255,.07);
+      box-shadow: inset 0 2px 3px rgba(0,0,0,.25);
+    }
+
+    .pressure-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 25px;
+      height: 25px;
+      margin-top: -9px;
+      border-radius: 50%;
+      background: #f6f1ff;
+      border: 2px solid #1e1528;
+      box-shadow: 0 0 0 4px rgba(255,255,255,.07), 0 4px 11px rgba(0,0,0,.40);
+      cursor: grab;
+    }
+
+    .pressure-slider::-moz-range-thumb {
+      width: 25px;
+      height: 25px;
+      border-radius: 50%;
+      background: #f6f1ff;
+      border: 2px solid #1e1528;
+      box-shadow: 0 0 0 4px rgba(255,255,255,.07), 0 4px 11px rgba(0,0,0,.40);
+      cursor: grab;
+    }
+
+    .pressure-slider:focus-visible {
+      outline: 2px solid var(--purple-2);
+      outline-offset: 2px;
+    }
+
+    .pressure-slider:disabled {
+      opacity: .77;
+      filter: saturate(.68) brightness(.83);
+      cursor: not-allowed;
+    }
+
+    .pressure-footer {
+      margin-top: 10px;
+      color: var(--muted-2);
+      font-size: 12px;
+      line-height: 1.45;
     }
 
     .state-card {
@@ -468,9 +705,12 @@
 
     @media (max-width: 670px) {
       body { padding-left: 12px; padding-right: 12px; }
+      .topline { align-items: stretch; flex-direction: column; }
+      .header-controls { align-items: stretch; width: 100%; }
+      .status-row { justify-content: space-between; }
       .grid { grid-template-columns: 1fr; }
       .summary-inner { padding: 18px; }
-      .state-card { padding: 15px; }
+      .state-card, .pressure-card { padding: 15px; }
       .segment { min-height: 68px; }
       .state-line { gap: 6px; }
       .summary-chip { min-height: 34px; padding: 6px 10px; }
@@ -486,6 +726,45 @@
       .updated { margin-top: 7px; }
       .state-card { padding: 14px; }
       .segment { min-height: 58px; }
+    }
+
+    /* iPad landscape: all four panels, summary, toggle and Pressure in one view. */
+    @media (orientation: landscape) and (min-width: 700px) and (max-height: 960px) {
+      body { padding: max(8px, env(safe-area-inset-top)) 14px max(8px, env(safe-area-inset-bottom)); }
+      .app { gap: 10px; }
+      .summary-card { position: relative; top: auto; }
+      .summary-inner { padding: 12px 16px 11px; }
+      .topline { gap: 10px; }
+      .brand { gap: 9px; }
+      .logo { width: 34px; height: 34px; border-radius: 11px; }
+      .eyebrow { font-size: 10px; margin-bottom: 3px; }
+      h1 { font-size: 23px; }
+      .header-controls { gap: 6px; }
+      .status-row { gap: 7px; }
+      .lock-status { min-height: 32px; min-width: 106px; font-size: 11px; }
+      .reset { min-height: 32px; padding: 0 14px; font-size: 12px; }
+      .no-trade-btn { min-height: 38px; }
+      .state-line { margin-top: 10px; gap: 6px; font-size: 16px; }
+      .summary-chip { min-height: 31px; padding: 4px 11px; }
+      .summary-text { margin-top: 7px; font-size: 12px; line-height: 1.3; }
+      .updated { display: none; }
+      .grid { gap: 10px; }
+      .state-card { padding: 13px; }
+      .card-head { margin-bottom: 9px; }
+      .segment { min-height: 61px; font-size: 16px; }
+      .pressure-card { padding: 12px 16px 10px; }
+      .pressure-top { margin-bottom: 5px; }
+      .pressure-copy { display: none; }
+      .pressure-scale { margin-bottom: 0; font-size: 11px; }
+      .pressure-slider { height: 39px; margin: 0; }
+      .pressure-footer { display: none; }
+      .hint { display: none; }
+    }
+
+    @media (max-width: 670px) {
+      .pressure-card { padding: 15px; }
+      .pressure-top { margin-bottom: 9px; }
+      .pressure-copy { font-size: 12px; margin-bottom: 9px; }
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -506,9 +785,12 @@
               <h1>Market State</h1>
             </div>
           </div>
-          <div class="status-wrap">
-            <div class="lock-status ready" id="lockStatus" role="status" aria-live="polite">READY</div>
-            <button class="reset" id="resetBtn" type="button">Reset</button>
+          <div class="header-controls">
+            <div class="status-row">
+              <div class="lock-status ready" id="lockStatus" role="status" aria-live="polite">READY</div>
+              <button class="reset" id="resetBtn" type="button">Reset</button>
+            </div>
+            <button class="no-trade-btn" id="noTradeBtn" type="button" aria-pressed="false" aria-label="CHOP. Tap to activate NO TRADE.">CHOP</button>
           </div>
         </div>
 
@@ -518,9 +800,33 @@
       </div>
     </section>
 
-    <section class="grid" id="stateGrid" aria-label="Market state controls"></section>
+    <section class="grid-shell" aria-label="Primary market state">
+      <section class="grid" id="stateGrid" aria-label="Market state controls"></section>
+      <div class="trade-block-overlay" id="noTradeOverlay" aria-hidden="true">
+        <svg viewBox="0 0 100 100" preserveAspectRatio="none" role="presentation" focusable="false">
+          <path class="x-halo" d="M 3 4 L 97 96 M 97 4 L 3 96" />
+          <path class="x-line" d="M 3 4 L 97 96 M 97 4 L 3 96" />
+        </svg>
+        <div class="overlay-badge">No Trade</div>
+      </div>
+    </section>
 
-    <p class="hint">Regime Trend cycles: green (bull trend) → red (bear trend) → clear. Your first change opens a 10-second edit window for any other updates; then the full panel locks for 5 minutes. Reset clears selections but never resets or cancels an active countdown. Both timers persist through refreshes and reopening the app.</p>
+    <section class="pressure-card" aria-label="Pressure slider">
+      <div class="pressure-top">
+        <h2 class="card-title">Pressure</h2>
+        <div class="pressure-value" id="pressureValue">Neutral</div>
+      </div>
+      <p class="pressure-copy">Immediate buying/selling pressure, independent of your broader lean.</p>
+      <div class="pressure-scale" aria-hidden="true">
+        <span>Bearish</span>
+        <span>Neutral</span>
+        <span>Bullish</span>
+      </div>
+      <input class="pressure-slider" id="pressureSlider" type="range" min="-1" max="1" step="1" value="0" aria-label="Pressure: Bearish, Neutral, or Bullish (three positions)" aria-valuetext="Neutral" />
+      <div class="pressure-footer" id="pressureHint">Three positions: Bearish · Neutral · Bullish.</div>
+    </section>
+
+    <p class="hint">HTF, Regime, Leg and Lean start a 10-second edit window, then lock for 5 minutes. CHOP / NO TRADE and Pressure stay adjustable at all times and never affect that timer. Reset clears selections without changing the timer. Settings persist on this device.</p>
   </main>
 
   <script>
@@ -557,7 +863,7 @@
       }
     ];
 
-    const defaultState = Object.fromEntries(groups.map(g => [g.id, null]));
+    const defaultState = { ...Object.fromEntries(groups.map(g => [g.id, null])), noTrade: false, pressure: 'Neutral' };
     let state = loadState();
     let lastUpdated = null;
     let editUntil = loadTimestamp(EDIT_UNTIL_KEY);
@@ -572,14 +878,21 @@
         groups.forEach(group => {
           const value = parsed[group.id];
           if (group.id === 'regime') {
-            // Migrate the old directionless Trend selection to the first new
-            // cycle state (green / bullish trend).
             if (value === 'Trend') clean.regime = 'TrendBull';
             else if (['TrendBull', 'TrendBear', 'Transition', 'Range'].includes(value)) clean.regime = value;
           } else if (group.options.includes(value)) {
             clean[group.id] = value;
           }
         });
+        clean.noTrade = Boolean(parsed.noTrade);
+        // Migrate an old continuous -100..+100 pressure reading to one of
+        // three named states. Named values remain unambiguous on subsequent loads.
+        if (['Bearish', 'Neutral', 'Bullish'].includes(parsed.pressure)) {
+          clean.pressure = parsed.pressure;
+        } else if (typeof parsed.pressure === 'number' && Number.isFinite(parsed.pressure)) {
+          clean.pressure = parsed.pressure <= -15 ? 'Bearish'
+            : parsed.pressure >= 15 ? 'Bullish' : 'Neutral';
+        }
         return clean;
       } catch {
         return { ...defaultState };
@@ -668,6 +981,8 @@
         status.textContent = 'READY';
       }
 
+      // Only the four committed market-state panels and Reset obey the lock.
+      // CHOP / NO TRADE and Pressure are live observations, always editable.
       reset.disabled = locked;
 
       document.querySelectorAll('.segment').forEach(button => {
@@ -696,8 +1011,8 @@
 
         updateLockUI();
 
-        // When the 10-second edit window expires, redraw once so every control
-        // becomes disabled immediately for the 5-minute lock.
+        // When the 10-second edit window expires, redraw to lock only the
+        // four market-state panels and Reset; the live controls stay active.
         if (wasEditing && !isEditing()) {
           render();
         }
@@ -739,6 +1054,48 @@
       saveState();
       beginCommitCycle();
       render();
+    }
+
+    function pressureLabel(value = state.pressure) {
+      return ['Bearish', 'Neutral', 'Bullish'].includes(value) ? value : 'Neutral';
+    }
+
+    function pressureTone(value = state.pressure) {
+      return value === 'Bearish' ? 'bearish' : value === 'Bullish' ? 'bullish' : 'neutral';
+    }
+
+    function renderPressure() {
+      const slider = document.getElementById('pressureSlider');
+      const value = document.getElementById('pressureValue');
+      const hint = document.getElementById('pressureHint');
+      if (!slider || !value || !hint) return;
+
+      slider.value = state.pressure === 'Bearish' ? '-1'
+        : state.pressure === 'Bullish' ? '1' : '0';
+      slider.setAttribute('aria-valuetext', pressureLabel());
+      slider.disabled = false;
+      const tone = pressureTone();
+      value.className = 'pressure-value' + (tone !== 'neutral' ? ` ${tone}` : '');
+      value.textContent = pressureLabel();
+      hint.textContent = state.pressure === 'Bullish'
+        ? 'Buying pressure, independent of the broader trend.'
+        : state.pressure === 'Bearish'
+          ? 'Selling pressure, independent of the broader trend.'
+          : 'Three positions: Bearish · Neutral · Bullish.';
+    }
+
+    function updateNoTradeUI() {
+      const button = document.getElementById('noTradeBtn');
+      const overlay = document.getElementById('noTradeOverlay');
+      if (!button || !overlay) return;
+      button.classList.toggle('active', !!state.noTrade);
+      button.setAttribute('aria-pressed', state.noTrade ? 'true' : 'false');
+      button.disabled = false;
+      button.textContent = state.noTrade ? 'NO TRADE' : 'CHOP';
+      button.setAttribute('aria-label', state.noTrade
+        ? 'NO TRADE active. Tap to return to CHOP.'
+        : 'CHOP. Tap to activate NO TRADE.');
+      overlay.classList.toggle('active', !!state.noTrade);
     }
 
     function render() {
@@ -796,6 +1153,8 @@
       });
 
       renderSummary();
+      renderPressure();
+      updateNoTradeUI();
       updateLockUI();
     }
 
@@ -819,7 +1178,11 @@
         }
       });
 
-      const readable = groups.map(group => `${group.summaryLabel}: ${displayValue(group)}`).join(' · ');
+      const readable = [
+        ...groups.map(group => `${group.summaryLabel}: ${displayValue(group)}`),
+        `Pressure: ${pressureLabel()}`,
+        `Trading filter: ${state.noTrade ? 'NO TRADE' : 'CHOP'}`
+      ].join(' · ');
       document.getElementById('summaryText').textContent = readable;
       document.getElementById('updatedText').textContent = lastUpdated
         ? `Updated ${lastUpdated.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
@@ -835,6 +1198,25 @@
       state = { ...defaultState };
       saveState();
       render();
+    });
+
+    document.getElementById('noTradeBtn').addEventListener('click', () => {
+      // A live trading filter: it never starts, extends or cancels the lock.
+      state.noTrade = !state.noTrade;
+      saveState();
+      renderSummary();
+      updateNoTradeUI();
+    });
+
+    document.getElementById('pressureSlider').addEventListener('input', (event) => {
+      // Pressure is observational and can always be changed, even mid-lock.
+      const nextValue = Number(event.target.value);
+      const nextPressure = nextValue < 0 ? 'Bearish' : nextValue > 0 ? 'Bullish' : 'Neutral';
+      if (state.pressure === nextPressure) return;
+      state.pressure = nextPressure;
+      saveState();
+      renderSummary();
+      renderPressure();
     });
 
     normalizeCycle();
